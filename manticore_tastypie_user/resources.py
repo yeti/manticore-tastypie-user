@@ -98,6 +98,7 @@ class LoginResource(ManticoreModelResource):
         return _create_api_token(bundle)
 
 
+#TODO: Link up multiple social auth profiles with 1 user
 class SocialSignUpResource(ManticoreModelResource):
 
     user = fields.ToOneField(UserResource, 'user', full=True)
