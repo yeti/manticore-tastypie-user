@@ -2,16 +2,32 @@ import base64
 from django.contrib.auth.models import User
 from django.db import IntegrityError
 from mezzanine.accounts import get_profile_model
+from social_auth.backends import get_backend
 from tastypie import fields
-from tastypie.authentication import Authentication, BasicAuthentication, OAuthAuthentication
+from tastypie.authentication import Authentication, BasicAuthentication
 from tastypie.authorization import Authorization, ReadOnlyAuthorization
 from tastypie.constants import ALL_WITH_RELATIONS
 from tastypie.exceptions import BadRequest
+from tastypie.models import ApiKey
+from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource
 
 
 UserProfile = get_profile_model()
+
+
+# Helper function for UserProfile resources to create a new API Key
+def _create_api_token(bundle):
+    user_profile = bundle.obj
+
+    # Delete existing api key for this user if it exists
+    ApiKey.objects.filter(user=user_profile.user).delete()
+
+    # Create a new api key object and return just the key for use
+    api_key = ApiKey.objects.create(user=user_profile.user)
+    api_key.save()
+    return api_key.key
 
 
 class UserResource(ManticoreModelResource):
@@ -32,7 +48,7 @@ class SignUpResource(ManticoreModelResource):
     creates a user then returns an API Token for further authenticated calls"""
 
     user = fields.ToOneField(UserResource, 'user', full=True)
-    token = fields.CharField(attribute='create_api_token')
+    token = fields.CharField(readonly=True)
 
     class Meta:
         queryset = UserProfile.objects.all()
@@ -43,10 +59,13 @@ class SignUpResource(ManticoreModelResource):
         always_return_data = True
         object_name = "user_profile"
 
+    def dehydrate_token(self, bundle):
+        return _create_api_token(bundle)
+
     def obj_create(self, bundle, request=None, **kwargs):
-        if User.objects.filter(email = bundle.data['email']):
+        if User.objects.filter(email=bundle.data['email']):
             raise BadRequest("That email has already been used")
-        elif User.objects.filter(username__iexact = bundle.data['username']):
+        elif User.objects.filter(username__iexact=bundle.data['username']):
             raise BadRequest("That username has already been used")
 
         try:
@@ -65,7 +84,7 @@ class LoginResource(ManticoreModelResource):
     """Uses Basic Http Auth to login a user, then returns an API Token for further authenticated calls"""
 
     user = fields.ToOneField(UserResource, 'user', full=True)
-    token = fields.CharField(attribute='create_api_token')
+    token = fields.CharField(readonly=True)
 
     class Meta:
         queryset = UserProfile.objects.all()
@@ -75,8 +94,41 @@ class LoginResource(ManticoreModelResource):
         resource_name = "login"
         object_name = "user_profile"
 
+    def dehydrate_token(self, bundle):
+        return _create_api_token(bundle)
 
-class ResetPasswordResource(ManticoreModelResource):
+
+class SocialSignUpResource(ManticoreModelResource):
+
+    user = fields.ToOneField(UserResource, 'user', full=True)
+    token = fields.CharField(readonly=True)
+
+    class Meta:
+        queryset = UserProfile.objects.all()
+        allowed_methods = ['post']
+        authentication = Authentication()
+        authorization = Authorization()
+        resource_name = "social_sign_up"
+        always_return_data = True
+        object_name = "user_profile"
+
+    def dehydrate_token(self, bundle):
+        return _create_api_token(bundle)
+
+    def obj_create(self, bundle, request=None, **kwargs):
+        provider = bundle.data['provider']
+        access_token = bundle.data['access_token']
+
+        backend = get_backend(provider, bundle.request, None)
+        user = backend.do_auth(access_token)
+        if user and user.is_active:
+            # Set bundle obj to user profile
+            bundle.obj = user.get_profile()
+            return bundle
+        else:
+            raise BadRequest("Error authenticating token")
+
+class ChangePasswordResource(ManticoreModelResource):
     """Takes in a new_password and old_password to change a user's password"""
 
     user = fields.ToOneField(UserResource, 'user', full=True)
@@ -85,8 +137,8 @@ class ResetPasswordResource(ManticoreModelResource):
         queryset = UserProfile.objects.all()
         allowed_methods = ['patch']
         authorization = UserObjectsOnlyAuthorization()
-        authentication = OAuthAuthentication()
-        resource_name = "reset_password"
+        authentication = ExpireApiKeyAuthentication()
+        resource_name = "change_password"
         always_return_data = True
         object_name = "user_profile"
 
@@ -108,16 +160,16 @@ class ResetPasswordResource(ManticoreModelResource):
 
     def dispatch(self, request_type, request, **kwargs):
         # Force this to be a single UserProfile update
-        return super(ResetPasswordResource, self).dispatch('detail', request, **kwargs)
+        return super(ChangePasswordResource, self).dispatch('detail', request, **kwargs)
 
     def patch_detail(self, request, **kwargs):
         # Place the authenticated user's id in the patch detail request
         kwargs['id'] = request.user.get_profile().pk
-        return super(ResetPasswordResource, self).patch_detail(request, **kwargs)
+        return super(ChangePasswordResource, self).patch_detail(request, **kwargs)
 
 
 class SearchUserProfileResource(ManticoreModelResource):
-    """Used to search for another's user profile"""
+    """Used to search for another user's user profile"""
 
     user = fields.ToOneField(UserResource, 'user', full=True)
 
@@ -125,7 +177,7 @@ class SearchUserProfileResource(ManticoreModelResource):
         queryset = UserProfile.objects.all()
         allowed_methods = ['get']
         authorization = ReadOnlyAuthorization()
-        authentication = OAuthAuthentication()
+        authentication = ExpireApiKeyAuthentication()
         resource_name = "search_user_profile"
         object_name = "user_profile"
         filtering = {
@@ -142,12 +194,13 @@ class UserProfileResource(ManticoreModelResource):
         queryset = UserProfile.objects.all()
         allowed_methods = ['get']
         authorization = UserObjectsOnlyAuthorization()
-        authentication = OAuthAuthentication()
+        authentication = ExpireApiKeyAuthentication()
         resource_name = "user_profile"
         object_name = "user_profile"
         filtering = {
             "user": ALL_WITH_RELATIONS
         }
+
 
 class EditUserProfileResource(ManticoreModelResource):
     """Allows the user's username and email to be changed"""
@@ -158,7 +211,7 @@ class EditUserProfileResource(ManticoreModelResource):
         queryset = UserProfile.objects.all()
         allowed_methods = ['patch']
         authorization = UserObjectsOnlyAuthorization()
-        authentication = OAuthAuthentication()
+        authentication = ExpireApiKeyAuthentication()
         resource_name = "edit_user_profile"
         always_return_data = True
         object_name = "user_profile"
