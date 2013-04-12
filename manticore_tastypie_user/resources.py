@@ -73,6 +73,12 @@ class SignUpResource(ManticoreModelResource):
             user.save()
 
             bundle.obj = UserProfile(user=user)
+
+            # Save any extra information on the user profile
+            for name, value in bundle.data.iteritems():
+                if value and value != getattr(user, name, None):
+                    setattr(user, name, value)
+
             bundle.obj.save()
         except IntegrityError:
             raise BadRequest('That username has already been used')
