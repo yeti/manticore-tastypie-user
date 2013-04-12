@@ -11,7 +11,7 @@ from tastypie.exceptions import BadRequest
 from tastypie.models import ApiKey
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization
-from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource
+from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureUploadResource
 
 
 UserProfile = get_profile_model()
@@ -203,7 +203,7 @@ class UserProfileResource(ManticoreModelResource):
         }
 
 
-class EditUserProfileResource(ManticoreModelResource):
+class EditUserProfileResource(PictureUploadResource):
     """Allows the user's username and email to be changed"""
 
     user = fields.ToOneField(UserResource, 'user', full=True)
