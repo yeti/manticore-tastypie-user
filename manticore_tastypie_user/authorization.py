@@ -70,7 +70,7 @@ class UserProfileObjectsOnlyAuthorization(Authorization):
 
     def delete_list(self, object_list, bundle):
         # Sorry user, no deletes for you!
-        raise Unauthorized("Sorry, no deletes.")
+        raise Unauthorized("Sorry, no bulk deletes.")
 
     def delete_detail(self, object_list, bundle):
-        raise Unauthorized("Sorry, no deletes.")
+        return bundle.obj.user_profile == bundle.request.user.get_profile()
