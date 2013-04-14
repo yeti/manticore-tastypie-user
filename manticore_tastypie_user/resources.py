@@ -251,3 +251,25 @@ class EditUserProfileResource(PictureUploadResource):
         # Place the authenticated user's id in the patch detail request
         kwargs['id'] = request.user.get_profile().pk
         return super(EditUserProfileResource, self).patch_detail(request, **kwargs)
+
+
+class MinimalUserProfileResource(ManticoreModelResource):
+    """Used to return minimal amount of info to identify a user's profile"""
+
+    username = fields.CharField()
+
+    class Meta:
+        queryset = UserProfile.objects.all()
+        allowed_methods = ['get']
+        authorization = ReadOnlyAuthorization()
+        authentication = ExpireApiKeyAuthentication()
+        resource_name = "user_profile"
+        object_name = "user_profile"
+        fields = ['id', 'username']
+        filtering = {
+            "id": ['exact'],
+            "user": ALL_WITH_RELATIONS
+        }
+
+    def dehydrate_username(self, bundle):
+        return bundle.obj.user.username
