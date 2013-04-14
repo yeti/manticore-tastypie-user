@@ -205,6 +205,7 @@ class UserProfileResource(ManticoreModelResource):
         resource_name = "user_profile"
         object_name = "user_profile"
         filtering = {
+            "id": ['exact'],
             "user": ALL_WITH_RELATIONS
         }
 
