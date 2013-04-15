@@ -1,4 +1,5 @@
 import base64
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError
 from mezzanine.accounts import get_profile_model
@@ -43,11 +44,26 @@ class UserResource(ManticoreModelResource):
         }
 
 
-class SignUpResource(ManticoreModelResource):
+class BaseUserProfileResource(ManticoreModelResource):
+    user = fields.ToOneField(UserResource, 'user', full=True)
+
+    class Meta:
+        pass
+
+    def dehydrate(self, bundle):
+        for field in settings.AUTH_PROFILE_EXTRA_FIELDS:
+            bundle.data[field] = getattr(bundle.obj, field, None)()
+
+        return bundle
+
+    def dehydrate_token(self, bundle):
+        return _create_api_token(bundle)
+
+
+class SignUpResource(BaseUserProfileResource):
     """Takes in an email, username, and base64 encoded password,
     creates a user then returns an API Token for further authenticated calls"""
 
-    user = fields.ToOneField(UserResource, 'user', full=True)
     token = fields.CharField(readonly=True)
 
     class Meta:
@@ -58,9 +74,6 @@ class SignUpResource(ManticoreModelResource):
         resource_name = "sign_up"
         always_return_data = True
         object_name = "user_profile"
-
-    def dehydrate_token(self, bundle):
-        return _create_api_token(bundle)
 
     def obj_create(self, bundle, request=None, **kwargs):
         if User.objects.filter(email=bundle.data['email']):
@@ -86,10 +99,9 @@ class SignUpResource(ManticoreModelResource):
         return bundle
 
 
-class LoginResource(ManticoreModelResource):
+class LoginResource(BaseUserProfileResource):
     """Uses Basic Http Auth to login a user, then returns an API Token for further authenticated calls"""
 
-    user = fields.ToOneField(UserResource, 'user', full=True)
     token = fields.CharField(readonly=True)
 
     class Meta:
@@ -100,14 +112,10 @@ class LoginResource(ManticoreModelResource):
         resource_name = "login"
         object_name = "user_profile"
 
-    def dehydrate_token(self, bundle):
-        return _create_api_token(bundle)
-
 
 #TODO: Link up multiple social auth profiles with 1 user
-class SocialSignUpResource(ManticoreModelResource):
+class SocialSignUpResource(BaseUserProfileResource):
 
-    user = fields.ToOneField(UserResource, 'user', full=True)
     token = fields.CharField(readonly=True)
 
     class Meta:
@@ -118,9 +126,6 @@ class SocialSignUpResource(ManticoreModelResource):
         resource_name = "social_sign_up"
         always_return_data = True
         object_name = "user_profile"
-
-    def dehydrate_token(self, bundle):
-        return _create_api_token(bundle)
 
     def obj_create(self, bundle, request=None, **kwargs):
         provider = bundle.data['provider']
@@ -175,10 +180,8 @@ class ChangePasswordResource(ManticoreModelResource):
         return super(ChangePasswordResource, self).patch_detail(request, **kwargs)
 
 
-class SearchUserProfileResource(ManticoreModelResource):
+class SearchUserProfileResource(BaseUserProfileResource):
     """Used to search for another user's user profile"""
-
-    user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
         queryset = UserProfile.objects.all()
@@ -192,10 +195,8 @@ class SearchUserProfileResource(ManticoreModelResource):
         }
 
 
-class UserProfileResource(ManticoreModelResource):
+class UserProfileResource(BaseUserProfileResource):
     """Used to return an authorized user's profile information"""
-
-    user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
         queryset = UserProfile.objects.all()
