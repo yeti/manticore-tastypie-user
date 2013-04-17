@@ -4,8 +4,9 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError
 from mezzanine.accounts import get_profile_model
 from social_auth.backends import get_backend
+from social_auth.db.django_models import UserSocialAuth
 from tastypie import fields
-from tastypie.authentication import Authentication, BasicAuthentication
+from tastypie.authentication import Authentication, BasicAuthentication, MultiAuthentication
 from tastypie.authorization import Authorization, ReadOnlyAuthorization
 from tastypie.constants import ALL_WITH_RELATIONS
 from tastypie.exceptions import BadRequest
@@ -113,7 +114,6 @@ class LoginResource(BaseUserProfileResource):
         object_name = "user_profile"
 
 
-#TODO: Link up multiple social auth profiles with 1 user
 class SocialSignUpResource(BaseUserProfileResource):
 
     token = fields.CharField(readonly=True)
@@ -121,7 +121,7 @@ class SocialSignUpResource(BaseUserProfileResource):
     class Meta:
         queryset = UserProfile.objects.all()
         allowed_methods = ['post']
-        authentication = Authentication()
+        authentication = MultiAuthentication(ExpireApiKeyAuthentication(), Authentication())
         authorization = Authorization()
         resource_name = "social_sign_up"
         always_return_data = True
@@ -131,14 +131,30 @@ class SocialSignUpResource(BaseUserProfileResource):
         provider = bundle.data['provider']
         access_token = bundle.data['access_token']
 
+        # If this request was made with an authenticated user, try to associate this social account with it
+        user = bundle.request.user if not bundle.request.user.is_anonymous() else None
+
         backend = get_backend(provider, bundle.request, None)
-        user = backend.do_auth(access_token)
+        user = backend.do_auth(access_token, user=user)
         if user and user.is_active:
             # Set bundle obj to user profile
             bundle.obj = user.get_profile()
             return bundle
         else:
             raise BadRequest("Error authenticating token")
+
+
+class UserSocialAuthenticationResource(ManticoreModelResource):
+
+    class Meta:
+        queryset = UserSocialAuth.objects.all()
+        allowed_methods = ['get']
+        authorization = UserObjectsOnlyAuthorization()
+        authentication = ExpireApiKeyAuthentication()
+        resource_name = "user_social_auth"
+        object_name = "user_social_auth"
+        fields = ['id', 'provider']
+
 
 class ChangePasswordResource(ManticoreModelResource):
     """Takes in a new_password and old_password to change a user's password"""

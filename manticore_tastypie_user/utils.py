@@ -1,4 +1,4 @@
-from manticore_tastypie_user.manticore_tastypie_user.resources import LoginResource, SignUpResource, ChangePasswordResource, SearchUserProfileResource, UserProfileResource, EditUserProfileResource, SocialSignUpResource
+from manticore_tastypie_user.manticore_tastypie_user.resources import LoginResource, SignUpResource, ChangePasswordResource, SearchUserProfileResource, UserProfileResource, EditUserProfileResource, SocialSignUpResource, UserSocialAuthenticationResource
 
 
 # Registers this library's resources
@@ -10,4 +10,5 @@ def register_api(api):
     api.register(UserProfileResource())
     api.register(EditUserProfileResource())
     api.register(SocialSignUpResource())
+    api.register(UserSocialAuthenticationResource())
     return api
