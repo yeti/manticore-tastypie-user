@@ -11,7 +11,7 @@ from manticore_tastypie_user.manticore_tastypie_user.resources import UserProfil
 
 def create_user_profile(backend, details, response, uid, user=None, social_user=None, *args, **kwargs):
     """Create a UserProfile for the User"""
-    print uid
+
     if user is None:
         return
 
@@ -20,6 +20,8 @@ def create_user_profile(backend, details, response, uid, user=None, social_user=
     except UserProfile.DoesNotExist:
         user_profile = UserProfile(user=user)
         user_profile.save()
+
+        # TODO: profile picture urls are already included in the 'response' object
 
         # Save photo from FB
         if backend.name == "facebook":
