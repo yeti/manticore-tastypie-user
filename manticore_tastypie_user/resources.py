@@ -295,3 +295,24 @@ class MinimalUserProfileResource(ManticoreModelResource):
 
     def dehydrate_username(self, bundle):
         return bundle.obj.user.username
+
+
+class LogoutResource(BaseUserProfileResource):
+
+    class Meta:
+        queryset = UserProfile.objects.all()
+        allowed_methods = ['get']
+        authorization = UserObjectsOnlyAuthorization()
+        authentication = ExpireApiKeyAuthentication()
+        resource_name = "logout"
+        object_name = "logout"
+        fields = ['id']
+
+    def obj_get_list(self, bundle, **kwargs):
+        filtered_list = super(LogoutResource, self).obj_get_list(bundle, **kwargs)
+        if len(filtered_list) > 1:
+            raise BadRequest("More than one profile found")
+
+        # Delete all ApiKeys for this user on logout
+        ApiKey.objects.filter(user=filtered_list.all()[0].user).delete()
+        return filtered_list
