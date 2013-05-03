@@ -269,6 +269,11 @@ class EditUserProfileResource(PictureVideoUploadResource):
         kwargs['id'] = request.user.get_profile().pk
         return super(EditUserProfileResource, self).patch_detail(request, **kwargs)
 
+    def get_detail(self, request, **kwargs):
+        # Place the authenticated user's id in the get detail request
+        kwargs['id'] = request.user.get_profile().pk
+        return super(EditUserProfileResource, self).get_detail(request, **kwargs)
+
 
 class MinimalUserProfileResource(ManticoreModelResource):
     """Used to return minimal amount of info to identify a user's profile"""
