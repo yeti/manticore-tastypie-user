@@ -1,4 +1,5 @@
 import base64
+import iso8601
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError
@@ -67,6 +68,11 @@ class SignUpResource(BaseUserProfileResource):
 
     token = fields.CharField(readonly=True)
 
+    # hacky fix for birthday
+    for f in UserProfile._meta.local_fields:
+        if f.name == "birthday":
+            birthday = fields.DateField(attribute="birthday")
+
     class Meta:
         queryset = UserProfile.objects.all()
         allowed_methods = ['post']
@@ -76,22 +82,33 @@ class SignUpResource(BaseUserProfileResource):
         always_return_data = True
         object_name = "user_profile"
 
+
     def obj_create(self, bundle, request=None, **kwargs):
+        if not 'username' in bundle.data or not 'email' in bundle.data or not 'password' in bundle.data:
+            raise BadRequest("Improper fields")
+
         if User.objects.filter(email=bundle.data['email']):
             raise BadRequest("That email has already been used")
         elif User.objects.filter(username__iexact=bundle.data['username']):
             raise BadRequest("That username has already been used")
 
+        new_username = bundle.data['username']
+        new_email = bundle.data['email']
+        new_password = base64.decodestring(bundle.data['password'])
+
+        if len(new_password) == 0:
+            raise BadRequest("Invalid password was provided")
+
         try:
-            user = User.objects.create_user(bundle.data['username'], bundle.data['email'], base64.decodestring(bundle.data['password']))
+            user = User.objects.create_user(new_username, new_email, new_password)
             user.save()
 
             bundle.obj = UserProfile(user=user)
 
             # Save any extra information on the user profile
             for name, value in bundle.data.iteritems():
-                if value and value != getattr(user, name, None):
-                    setattr(user, name, value)
+                if value and value != getattr(bundle.obj, name, None):
+                    setattr(bundle.obj, name, value)
 
             bundle.obj.save()
         except IntegrityError:
@@ -250,8 +267,11 @@ class EditUserProfileResource(PictureVideoUploadResource):
             else:
                 user.username = username
 
-        if 'email' in bundle.data and len(bundle.data['email']) > 0:
-            user.email = bundle.data['email']
+        if 'email' in bundle.data and bundle.data['email'] != user.email and len(bundle.data['email']) > 0:
+            if User.objects.filter(email=bundle.data['email']):
+                raise BadRequest("That email has already been used")
+            else:
+                user.email = bundle.data['email']
 
         if 'password' in bundle.data and len(bundle.data['password']) > 0:
             user.set_password(base64.decodestring(bundle.data['password']))
