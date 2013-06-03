@@ -224,7 +224,7 @@ class SearchUserProfileResource(BaseUserProfileResource):
         queryset = UserProfile.objects.all()
         allowed_methods = ['get']
         authorization = ReadOnlyAuthorization()
-        authentication = ExpireApiKeyAuthentication()
+        authentication = MultiAuthentication(ExpireApiKeyAuthentication(), Authentication())
         resource_name = "search_user_profile"
         object_name = "user_profile"
         filtering = {
