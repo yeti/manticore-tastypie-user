@@ -25,12 +25,14 @@ UserProfile = get_profile_model()
 def _create_api_token(bundle):
     user_profile = bundle.obj
 
-    # Delete existing api key for this user if it exists
-    ApiKey.objects.filter(user=user_profile.user).delete()
+    # Maintain one ApiKey per user
+    if ApiKey.objects.filter(user=user_profile.user).exists():
+        api_key = ApiKey.objects.filter(user=user_profile.user).all()[0]
+    else:
+        # Create a new api key object and return just the key for use
+        api_key = ApiKey.objects.create(user=user_profile.user)
+        api_key.save()
 
-    # Create a new api key object and return just the key for use
-    api_key = ApiKey.objects.create(user=user_profile.user)
-    api_key.save()
     return api_key.key
 
 
