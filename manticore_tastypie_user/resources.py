@@ -1,5 +1,4 @@
 import base64
-import iso8601
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError
@@ -84,7 +83,6 @@ class SignUpResource(BaseUserProfileResource):
         resource_name = "sign_up"
         always_return_data = True
         object_name = "user_profile"
-
 
     def obj_create(self, bundle, request=None, **kwargs):
         if not 'username' in bundle.data or not 'email' in bundle.data or not 'password' in bundle.data:

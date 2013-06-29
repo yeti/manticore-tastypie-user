@@ -1,3 +1,4 @@
+from _ssl import SSLError
 import json
 import urllib
 from urllib2 import URLError
@@ -47,8 +48,20 @@ def create_user_profile(backend, details, response, uid, user=None, social_user=
             try:
                 image_url = "https://graph.facebook.com/%s/picture?type=large" % uid
                 result = urllib.urlretrieve(image_url)
-                user_profile.original_photo.save("%s.jpg" % uid, File(open(result[0])))
-                user_profile.save(update_fields=['original_photo'])
+
+                done, tries = False, 0
+                while not done:
+                    try:
+                        user_profile.original_photo.save("%s.jpg" % uid, File(open(result[0])))
+                        user_profile.save(update_fields=['original_photo'])
+                        done = True
+                    except SSLError:
+                        pass
+
+                    # Try at max, 10 times before quitting
+                    tries += 1
+                    if tries > 10:
+                        done = True
             except URLError:
                 pass
         elif backend.name == "twitter" and social_user:
@@ -64,8 +77,19 @@ def create_user_profile(backend, details, response, uid, user=None, social_user=
                 # Get profile image to save
                 if twitter_user['profile_image_url'] != '':
                     image_result = urllib.urlretrieve(twitter_user['profile_image_url'])
-                    user_profile.original_photo.save("%s.jpg" % uid, File(open(image_result[0])))
-                    print 'original_photo saved'
-                    user_profile.save(update_fields=['original_photo'])
+
+                    done, tries = False, 0
+                    while not done:
+                        try:
+                            user_profile.original_photo.save("%s.jpg" % uid, File(open(image_result[0])))
+                            user_profile.save(update_fields=['original_photo'])
+                            done = True
+                        except SSLError:
+                            pass
+
+                        # Try at max, 10 times before quitting
+                        tries += 1
+                        if tries > 10:
+                            done = True
             except URLError:
                 pass
