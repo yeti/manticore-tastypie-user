@@ -206,6 +206,8 @@ class ChangePasswordResource(ManticoreModelResource):
         else:
             bundle.obj.user.set_password(base64.decodestring(bundle.data['new_password']))
 
+        bundle.obj.user.save()
+
         return bundle
 
     def dispatch(self, request_type, request, **kwargs):
