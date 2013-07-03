@@ -190,6 +190,7 @@ class ChangePasswordResource(ManticoreModelResource):
         resource_name = "change_password"
         always_return_data = True
         object_name = "user_profile"
+        excludes = ["original_photo", "small_photo", "large_photo", "thumbnail"]
 
     def hydrate(self, bundle):
         if not bundle.data.has_key('new_password'):
