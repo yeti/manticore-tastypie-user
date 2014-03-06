@@ -1,7 +1,9 @@
 import base64
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.core.validators import email_re
+from django.core.validators import validate_email
 from social_auth.backends import get_backend
 from social_auth.db.django_models import UserSocialAuth
 from tastypie import fields
@@ -15,7 +17,7 @@ from manticore_tastypie_user.manticore_tastypie_user.authorization import UserOb
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
 
 
-User = settings.AUTH_USER_MODEL
+User = get_user_model()
 
 
 # Helper function for User resources to create a new API Key
@@ -98,7 +100,9 @@ class SignUpResource(BaseUserResource):
         if len(new_password) == 0:
             raise BadRequest("Invalid password was provided")
 
-        if not email_re.match(new_email):
+        try:
+            validate_email(new_email)
+        except ValidationError:
             raise BadRequest("Email address is not formatted properly")
 
         try:
@@ -275,9 +279,11 @@ class EditUserResource(PictureVideoUploadResource):
         if 'email' in bundle.data and bundle.data['email'] != user.email and len(bundle.data['email']) > 0:
             if User.objects.filter(email=bundle.data['email']):
                 raise BadRequest("That email has already been used")
-            elif not email_re.match(bundle.data['email']):
-                raise BadRequest("Email address is not formatted properly")
             else:
+                try:
+                    validate_email(bundle.data['email'])
+                except ValidationError:
+                    raise BadRequest("Email address is not formatted properly")
                 user.email = bundle.data['email']
 
         if 'password' in bundle.data and len(bundle.data['password']) > 0:
