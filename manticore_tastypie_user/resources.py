@@ -49,16 +49,15 @@ class UserResource(ManticoreModelResource):
 
 
 class BaseUserResource(ManticoreModelResource):
-    user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
         pass
 
-    def dehydrate(self, bundle):
-        for field in settings.AUTH_PROFILE_EXTRA_FIELDS:
-            bundle.data[field] = getattr(bundle.obj, field, None)()
-
-        return bundle
+    # def dehydrate(self, bundle):
+    #     for field in settings.AUTH_PROFILE_EXTRA_FIELDS:
+    #         bundle.data[field] = getattr(bundle.obj, field, None)()
+    #
+    #     return bundle
 
     def dehydrate_token(self, bundle):
         return _create_api_token(bundle)
@@ -109,9 +108,9 @@ class SignUpResource(BaseUserResource):
             user = User.objects.create_user(new_username, new_email, new_password)
             user.save()
 
-            bundle.obj = User(user=user)
+            bundle.obj = user
 
-            # Save any extra information on the user profile
+            # Save any extra information
             for name, value in bundle.data.iteritems():
                 if value and value != getattr(bundle.obj, name, None):
                     setattr(bundle.obj, name, value)
@@ -160,7 +159,6 @@ class SocialSignUpResource(BaseUserResource):
         backend = get_backend(provider, bundle.request, None)
         user = backend.do_auth(access_token, user=user)
         if user and user.is_active:
-            # Set bundle obj to user profile
             bundle.obj = user
             return bundle
         else:
@@ -182,8 +180,6 @@ class UserSocialAuthenticationResource(ManticoreModelResource):
 class ChangePasswordResource(ManticoreModelResource):
     """Takes in a new_password and old_password to change a user's password"""
 
-    user = fields.ToOneField(UserResource, 'user', full=True)
-
     class Meta:
         queryset = User.objects.all()
         allowed_methods = ['patch']
@@ -195,11 +191,11 @@ class ChangePasswordResource(ManticoreModelResource):
         excludes = ["original_photo", "small_photo", "large_photo", "thumbnail"]
 
     def hydrate(self, bundle):
-        if not bundle.data.has_key('new_password'):
+        if not 'new_password' in bundle.data:
             raise BadRequest("No new password specified")
 
         if bundle.obj.user.password:
-            if not bundle.data.has_key('old_password'):
+            if not 'old_password' in bundle.data:
                 raise BadRequest("No old password specified when user has an existing password")
             elif not bundle.obj.user.check_password(base64.decodestring(bundle.data['old_password'])):
                 raise BadRequest('old password does not match')
@@ -223,7 +219,7 @@ class ChangePasswordResource(ManticoreModelResource):
 
 
 class SearchUserResource(BaseUserResource):
-    """Used to search for another user's user profile"""
+    """Used to search for another user"""
 
     class Meta:
         queryset = User.objects.all()
@@ -238,7 +234,7 @@ class SearchUserResource(BaseUserResource):
 
 
 class UserResource(BaseUserResource):
-    """Used to return an authorized user's profile information"""
+    """Used to return an authorized user's information"""
 
     class Meta:
         queryset = User.objects.all()
@@ -255,8 +251,6 @@ class UserResource(BaseUserResource):
 
 class EditUserResource(PictureVideoUploadResource):
     """Allows the user's username and email to be changed"""
-
-    user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
         queryset = User.objects.all()
@@ -309,7 +303,7 @@ class EditUserResource(PictureVideoUploadResource):
 
 
 class MinimalUserResource(ManticoreModelResource):
-    """Used to return minimal amount of info to identify a user's profile"""
+    """Used to return minimal amount of info to identify a user"""
 
     username = fields.CharField()
 
