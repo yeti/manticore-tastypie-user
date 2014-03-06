@@ -1,9 +1,7 @@
 import base64
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.core.validators import email_re
-from mezzanine.accounts import get_profile_model
 from social_auth.backends import get_backend
 from social_auth.db.django_models import UserSocialAuth
 from tastypie import fields
@@ -17,19 +15,19 @@ from manticore_tastypie_user.manticore_tastypie_user.authorization import UserOb
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
 
 
-UserProfile = get_profile_model()
+User = settings.AUTH_USER_MODEL
 
 
-# Helper function for UserProfile resources to create a new API Key
+# Helper function for User resources to create a new API Key
 def _create_api_token(bundle):
-    user_profile = bundle.obj
+    user = bundle.obj
 
     # Maintain one ApiKey per user
-    if ApiKey.objects.filter(user=user_profile.user).exists():
-        api_key = ApiKey.objects.filter(user=user_profile.user).all()[0]
+    if ApiKey.objects.filter(user=user).exists():
+        api_key = ApiKey.objects.filter(user=user).all()[0]
     else:
         # Create a new api key object and return just the key for use
-        api_key = ApiKey.objects.create(user=user_profile.user)
+        api_key = ApiKey.objects.create(user=user)
         api_key.save()
 
     return api_key.key
@@ -48,7 +46,7 @@ class UserResource(ManticoreModelResource):
         }
 
 
-class BaseUserProfileResource(ManticoreModelResource):
+class BaseUserResource(ManticoreModelResource):
     user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
@@ -64,25 +62,25 @@ class BaseUserProfileResource(ManticoreModelResource):
         return _create_api_token(bundle)
 
 
-class SignUpResource(BaseUserProfileResource):
+class SignUpResource(BaseUserResource):
     """Takes in an email, username, and base64 encoded password,
     creates a user then returns an API Token for further authenticated calls"""
 
     token = fields.CharField(readonly=True)
 
     # hacky fix for birthday
-    for f in UserProfile._meta.local_fields:
+    for f in User._meta.local_fields:
         if f.name == "birthday":
             birthday = fields.DateField(attribute="birthday")
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['post']
         authorization = Authorization()
         authentication = Authentication()
         resource_name = "sign_up"
         always_return_data = True
-        object_name = "user_profile"
+        object_name = "user"
 
     def obj_create(self, bundle, request=None, **kwargs):
         if not 'username' in bundle.data or not 'email' in bundle.data or not 'password' in bundle.data:
@@ -107,7 +105,7 @@ class SignUpResource(BaseUserProfileResource):
             user = User.objects.create_user(new_username, new_email, new_password)
             user.save()
 
-            bundle.obj = UserProfile(user=user)
+            bundle.obj = User(user=user)
 
             # Save any extra information on the user profile
             for name, value in bundle.data.iteritems():
@@ -121,32 +119,32 @@ class SignUpResource(BaseUserProfileResource):
         return bundle
 
 
-class LoginResource(BaseUserProfileResource):
+class LoginResource(BaseUserResource):
     """Uses Basic Http Auth to login a user, then returns an API Token for further authenticated calls"""
 
     token = fields.CharField(readonly=True)
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = UserObjectsOnlyAuthorization()
         authentication = BasicAuthentication()
         resource_name = "login"
-        object_name = "user_profile"
+        object_name = "user"
 
 
-class SocialSignUpResource(BaseUserProfileResource):
+class SocialSignUpResource(BaseUserResource):
 
     token = fields.CharField(readonly=True)
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['post']
         authentication = MultiAuthentication(ExpireApiKeyAuthentication(), Authentication())
         authorization = Authorization()
         resource_name = "social_sign_up"
         always_return_data = True
-        object_name = "user_profile"
+        object_name = "user"
 
     def obj_create(self, bundle, request=None, **kwargs):
         provider = bundle.data['provider']
@@ -159,7 +157,7 @@ class SocialSignUpResource(BaseUserProfileResource):
         user = backend.do_auth(access_token, user=user)
         if user and user.is_active:
             # Set bundle obj to user profile
-            bundle.obj = user.get_profile()
+            bundle.obj = user
             return bundle
         else:
             raise BadRequest("Error authenticating token")
@@ -183,13 +181,13 @@ class ChangePasswordResource(ManticoreModelResource):
     user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['patch']
         authorization = UserObjectsOnlyAuthorization()
         authentication = ExpireApiKeyAuthentication()
         resource_name = "change_password"
         always_return_data = True
-        object_name = "user_profile"
+        object_name = "user"
         excludes = ["original_photo", "small_photo", "large_photo", "thumbnail"]
 
     def hydrate(self, bundle):
@@ -211,59 +209,59 @@ class ChangePasswordResource(ManticoreModelResource):
         return bundle
 
     def dispatch(self, request_type, request, **kwargs):
-        # Force this to be a single UserProfile update
+        # Force this to be a single User update
         return super(ChangePasswordResource, self).dispatch('detail', request, **kwargs)
 
     def patch_detail(self, request, **kwargs):
         # Place the authenticated user's id in the patch detail request
-        kwargs['id'] = request.user.get_profile().pk
+        kwargs['id'] = request.user.pk
         return super(ChangePasswordResource, self).patch_detail(request, **kwargs)
 
 
-class SearchUserProfileResource(BaseUserProfileResource):
+class SearchUserResource(BaseUserResource):
     """Used to search for another user's user profile"""
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = ReadOnlyAuthorization()
         authentication = MultiAuthentication(ExpireApiKeyAuthentication(), Authentication())
-        resource_name = "search_user_profile"
-        object_name = "user_profile"
+        resource_name = "search_user"
+        object_name = "user"
         filtering = {
             "user": ALL_WITH_RELATIONS
         }
 
 
-class UserProfileResource(BaseUserProfileResource):
+class UserResource(BaseUserResource):
     """Used to return an authorized user's profile information"""
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = UserObjectsOnlyAuthorization()
         authentication = ExpireApiKeyAuthentication()
-        resource_name = "user_profile"
-        object_name = "user_profile"
+        resource_name = "user"
+        object_name = "user"
         filtering = {
             "id": ['exact'],
             "user": ALL_WITH_RELATIONS
         }
 
 
-class EditUserProfileResource(PictureVideoUploadResource):
+class EditUserResource(PictureVideoUploadResource):
     """Allows the user's username and email to be changed"""
 
     user = fields.ToOneField(UserResource, 'user', full=True)
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['patch']
         authorization = UserObjectsOnlyAuthorization()
         authentication = ExpireApiKeyAuthentication()
-        resource_name = "edit_user_profile"
+        resource_name = "edit_user"
         always_return_data = True
-        object_name = "user_profile"
+        object_name = "user"
 
     def save_related(self, bundle):
         user = bundle.obj.user
@@ -287,35 +285,35 @@ class EditUserProfileResource(PictureVideoUploadResource):
 
         user.save()
 
-        return super(EditUserProfileResource, self).save_related(bundle)
+        return super(EditUserResource, self).save_related(bundle)
 
     def dispatch(self, request_type, request, **kwargs):
-        # Force this to be a single UserProfile update
-        return super(EditUserProfileResource, self).dispatch('detail', request, **kwargs)
+        # Force this to be a single User update
+        return super(EditUserResource, self).dispatch('detail', request, **kwargs)
 
     def patch_detail(self, request, **kwargs):
         # Place the authenticated user's id in the patch detail request
-        kwargs['id'] = request.user.get_profile().pk
-        return super(EditUserProfileResource, self).patch_detail(request, **kwargs)
+        kwargs['id'] = request.user.pk
+        return super(EditUserResource, self).patch_detail(request, **kwargs)
 
     def get_detail(self, request, **kwargs):
         # Place the authenticated user's id in the get detail request
-        kwargs['id'] = request.user.get_profile().pk
-        return super(EditUserProfileResource, self).get_detail(request, **kwargs)
+        kwargs['id'] = request.user.pk
+        return super(EditUserResource, self).get_detail(request, **kwargs)
 
 
-class MinimalUserProfileResource(ManticoreModelResource):
+class MinimalUserResource(ManticoreModelResource):
     """Used to return minimal amount of info to identify a user's profile"""
 
     username = fields.CharField()
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = ReadOnlyAuthorization()
         authentication = ExpireApiKeyAuthentication()
-        resource_name = "user_profile"
-        object_name = "user_profile"
+        resource_name = "user"
+        object_name = "user"
         fields = ['id', 'username']
         filtering = {
             "id": ['exact'],
@@ -323,13 +321,13 @@ class MinimalUserProfileResource(ManticoreModelResource):
         }
 
     def dehydrate_username(self, bundle):
-        return bundle.obj.user.username
+        return bundle.obj.username
 
 
-class LogoutResource(BaseUserProfileResource):
+class LogoutResource(BaseUserResource):
 
     class Meta:
-        queryset = UserProfile.objects.all()
+        queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = UserObjectsOnlyAuthorization()
         authentication = ExpireApiKeyAuthentication()
