@@ -229,23 +229,8 @@ class SearchUserResource(BaseUserResource):
         resource_name = "search_user"
         object_name = "user"
         filtering = {
-            "user": ALL_WITH_RELATIONS
-        }
-
-
-class UserResource(BaseUserResource):
-    """Used to return an authorized user's information"""
-
-    class Meta:
-        queryset = User.objects.all()
-        allowed_methods = ['get']
-        authorization = UserObjectsOnlyAuthorization()
-        authentication = ExpireApiKeyAuthentication()
-        resource_name = "user"
-        object_name = "user"
-        filtering = {
             "id": ['exact'],
-            "user": ALL_WITH_RELATIONS
+            "username": ['exact', 'iexact', 'contains', 'icontains']
         }
 
 
@@ -317,7 +302,6 @@ class MinimalUserResource(ManticoreModelResource):
         fields = ['id', 'username']
         filtering = {
             "id": ['exact'],
-            "user": ALL_WITH_RELATIONS
         }
 
     def dehydrate_username(self, bundle):
