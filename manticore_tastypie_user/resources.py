@@ -1,15 +1,13 @@
 import base64
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.core.validators import validate_email
-from social_auth.backends import get_backend
-from social_auth.db.django_models import UserSocialAuth
+from social.apps.django_app import load_strategy
+from social.apps.django_app.default.models import UserSocialAuth
 from tastypie import fields
 from tastypie.authentication import Authentication, BasicAuthentication, MultiAuthentication
 from tastypie.authorization import Authorization, ReadOnlyAuthorization
-from tastypie.constants import ALL_WITH_RELATIONS
 from tastypie.exceptions import BadRequest
 from tastypie.models import ApiKey
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
@@ -112,7 +110,7 @@ class SignUpResource(BaseUserResource):
 
             # Save any extra information
             for name, value in bundle.data.iteritems():
-                if value and value != getattr(bundle.obj, name, None):
+                if value and value != getattr(bundle.obj, name, None) and name not in ['username', 'email', 'password']:
                     setattr(bundle.obj, name, value)
 
             bundle.obj.save()
@@ -156,8 +154,10 @@ class SocialSignUpResource(BaseUserResource):
         # If this request was made with an authenticated user, try to associate this social account with it
         user = bundle.request.user if not bundle.request.user.is_anonymous() else None
 
-        backend = get_backend(provider, bundle.request, None)
-        user = backend.do_auth(access_token, user=user)
+        strategy = load_strategy(backend=provider)
+
+        # backend = get_backend(settings.AUTHENTICATION_BACKENDS, provider)
+        user = strategy.backend.do_auth(access_token, user=user)
         if user and user.is_active:
             bundle.obj = user
             return bundle
