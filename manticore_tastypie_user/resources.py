@@ -11,7 +11,8 @@ from tastypie.authorization import Authorization, ReadOnlyAuthorization
 from tastypie.exceptions import BadRequest
 from tastypie.models import ApiKey
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
-from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization
+from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization, \
+    UserLoginAuthorization
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
 
 
@@ -128,7 +129,7 @@ class LoginResource(BaseUserResource):
     class Meta:
         queryset = User.objects.all()
         allowed_methods = ['get']
-        authorization = UserObjectsOnlyAuthorization()
+        authorization = UserLoginAuthorization()
         authentication = BasicAuthentication()
         resource_name = "login"
         object_name = "user"
