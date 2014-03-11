@@ -39,7 +39,7 @@ class UserResource(ManticoreModelResource):
     class Meta:
         queryset = User.objects.all()
         resource_name = "user"
-        fields = ['username', 'email']
+        fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo']
         object_name = "users"
         allowed_methods = ['get']
         filtering = {
@@ -50,7 +50,11 @@ class UserResource(ManticoreModelResource):
 class BaseUserResource(ManticoreModelResource):
 
     class Meta:
-        pass
+        fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo']
+        allowed_methods = ['get']
+        filtering = {
+            "username": ['exact', 'iexact', 'contains', 'icontains']
+        }
 
     # def dehydrate(self, bundle):
     #     for field in settings.AUTH_PROFILE_EXTRA_FIELDS:
@@ -73,7 +77,7 @@ class SignUpResource(BaseUserResource):
         if f.name == "birthday":
             birthday = fields.DateField(attribute="birthday")
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['post']
         authorization = Authorization()
@@ -126,7 +130,7 @@ class LoginResource(BaseUserResource):
 
     token = fields.CharField(readonly=True)
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = UserLoginAuthorization()
@@ -139,7 +143,7 @@ class SocialSignUpResource(BaseUserResource):
 
     token = fields.CharField(readonly=True)
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['post']
         authentication = MultiAuthentication(ExpireApiKeyAuthentication(), Authentication())
@@ -195,17 +199,17 @@ class ChangePasswordResource(ManticoreModelResource):
         if not 'new_password' in bundle.data:
             raise BadRequest("No new password specified")
 
-        if bundle.obj.user.password:
+        if bundle.obj.password:
             if not 'old_password' in bundle.data:
                 raise BadRequest("No old password specified when user has an existing password")
-            elif not bundle.obj.user.check_password(base64.decodestring(bundle.data['old_password'])):
+            elif not bundle.obj.check_password(base64.decodestring(bundle.data['old_password'])):
                 raise BadRequest('old password does not match')
 
-            bundle.obj.user.set_password(base64.decodestring(bundle.data['new_password']))
+            bundle.obj.set_password(base64.decodestring(bundle.data['new_password']))
         else:
-            bundle.obj.user.set_password(base64.decodestring(bundle.data['new_password']))
+            bundle.obj.set_password(base64.decodestring(bundle.data['new_password']))
 
-        bundle.obj.user.save()
+        bundle.obj.save()
 
         return bundle
 
@@ -222,7 +226,7 @@ class ChangePasswordResource(ManticoreModelResource):
 class SearchUserResource(BaseUserResource):
     """Used to search for another user"""
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = ReadOnlyAuthorization()
@@ -248,7 +252,7 @@ class EditUserResource(PictureVideoUploadResource):
         object_name = "user"
 
     def save_related(self, bundle):
-        user = bundle.obj.user
+        user = bundle.obj
         if 'username' in bundle.data and bundle.data['username'] != user.username and len(bundle.data['username']) > 0:
             username = bundle.data['username'].replace(' ', '')
             if User.objects.filter(username__iexact=username):
@@ -288,6 +292,18 @@ class EditUserResource(PictureVideoUploadResource):
         return super(EditUserResource, self).get_detail(request, **kwargs)
 
 
+class MyUserResource(BaseUserResource):
+    """Used to return an authorized user's information"""
+
+    class Meta(BaseUserResource.Meta):
+        queryset = User.objects.all()
+        allowed_methods = ['get']
+        authorization = UserLoginAuthorization()
+        authentication = ExpireApiKeyAuthentication()
+        resource_name = "my_user"
+        object_name = "user"
+
+
 class MinimalUserResource(ManticoreModelResource):
     """Used to return minimal amount of info to identify a user"""
 
@@ -311,7 +327,7 @@ class MinimalUserResource(ManticoreModelResource):
 
 class LogoutResource(BaseUserResource):
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['get']
         authorization = UserObjectsOnlyAuthorization()
@@ -326,5 +342,5 @@ class LogoutResource(BaseUserResource):
             raise BadRequest("More than one profile found")
 
         # Delete all ApiKeys for this user on logout
-        ApiKey.objects.filter(user=filtered_list.all()[0].user).delete()
+        ApiKey.objects.filter(user=filtered_list.all()[0]).delete()
         return filtered_list
