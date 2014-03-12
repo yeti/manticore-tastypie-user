@@ -39,7 +39,8 @@ class UserResource(ManticoreModelResource):
     class Meta:
         queryset = User.objects.all()
         resource_name = "user"
-        fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo']
+        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
+        excludes = ['password']
         object_name = "users"
         allowed_methods = ['get']
         filtering = {
@@ -50,7 +51,8 @@ class UserResource(ManticoreModelResource):
 class BaseUserResource(ManticoreModelResource):
 
     class Meta:
-        fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo']
+        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
+        excludes = ['password']
         allowed_methods = ['get']
         filtering = {
             "username": ['exact', 'iexact', 'contains', 'icontains']
