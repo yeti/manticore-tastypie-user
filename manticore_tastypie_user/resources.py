@@ -14,6 +14,7 @@ from manticore_tastypie_user.manticore_tastypie_user.authentication import Expir
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization, \
     UserLoginAuthorization
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
+import settings
 
 
 User = get_user_model()
@@ -34,7 +35,27 @@ def _create_api_token(bundle):
     return api_key.key
 
 
-class UserResource(ManticoreModelResource):
+class BaseUserResource(ManticoreModelResource):
+
+    class Meta:
+        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
+        excludes = ['password']
+        allowed_methods = ['get']
+        filtering = {
+            "username": ['exact', 'iexact', 'contains', 'icontains']
+        }
+
+    def dehydrate(self, bundle):
+        for field in settings.USER_EXTRA_FIELDS:
+            bundle.data[field] = getattr(bundle.obj, field, None)()
+
+        return bundle
+
+    def dehydrate_token(self, bundle):
+        return _create_api_token(bundle)
+
+
+class UserResource(BaseUserResource):
 
     class Meta:
         queryset = User.objects.all()
@@ -46,26 +67,6 @@ class UserResource(ManticoreModelResource):
         filtering = {
             "username": ['exact', 'iexact', 'contains', 'icontains']
         }
-
-
-class BaseUserResource(ManticoreModelResource):
-
-    class Meta:
-        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
-        excludes = ['password']
-        allowed_methods = ['get']
-        filtering = {
-            "username": ['exact', 'iexact', 'contains', 'icontains']
-        }
-
-    # def dehydrate(self, bundle):
-    #     for field in settings.AUTH_PROFILE_EXTRA_FIELDS:
-    #         bundle.data[field] = getattr(bundle.obj, field, None)()
-    #
-    #     return bundle
-
-    def dehydrate_token(self, bundle):
-        return _create_api_token(bundle)
 
 
 class SignUpResource(BaseUserResource):
