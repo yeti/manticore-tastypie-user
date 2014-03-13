@@ -241,6 +241,13 @@ class SearchUserResource(BaseUserResource):
             "username": ['exact', 'iexact', 'contains', 'icontains']
         }
 
+    def dehydrate(self, bundle):
+        if bundle.obj in bundle.request.user.user_following():
+            bundle.data['following'] = True
+        else:
+            bundle.data['following'] = False
+        return bundle
+
 
 class EditUserResource(PictureVideoUploadResource):
     """Allows the user's username and email to be changed"""
