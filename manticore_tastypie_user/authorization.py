@@ -39,14 +39,14 @@ class UserObjectsOnlyAuthorization(Authorization):
 
     def read_detail(self, object_list, bundle):
         # Is the requested object owned by the user?
-        return bundle.obj.user == bundle.request.user
+        return bundle.obj == bundle.request.user
 
     def create_list(self, object_list, bundle):
         # Assuming their auto-assigned to ``user``.
         return object_list
 
     def create_detail(self, object_list, bundle):
-        return bundle.obj.user == bundle.request.user
+        return bundle.obj == bundle.request.user
 
     def update_list(self, object_list, bundle):
         allowed = []
@@ -66,7 +66,7 @@ class UserObjectsOnlyAuthorization(Authorization):
         raise Unauthorized("Sorry, no deletes.")
 
     def delete_detail(self, object_list, bundle):
-        return bundle.obj.user == bundle.request.user
+        return bundle.obj == bundle.request.user
 
 
 class RelateUserAuthorization(Authorization):
@@ -97,11 +97,11 @@ class RelateUserAuthorization(Authorization):
         return allowed
 
     def update_detail(self, object_list, bundle):
-        return bundle.obj.user == bundle.request.user
+        return bundle.obj == bundle.request.user
 
     def delete_list(self, object_list, bundle):
         # Sorry user, no deletes for you!
         raise Unauthorized("Sorry, no bulk deletes.")
 
     def delete_detail(self, object_list, bundle):
-        return bundle.obj.user == bundle.request.user
+        return bundle.obj == bundle.request.user
