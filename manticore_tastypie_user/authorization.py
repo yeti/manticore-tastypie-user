@@ -59,14 +59,14 @@ class UserObjectsOnlyAuthorization(Authorization):
         return allowed
 
     def update_detail(self, object_list, bundle):
-        return bundle.obj.user == bundle.request.user
+        return bundle.obj == bundle.request.user
 
     def delete_list(self, object_list, bundle):
         # Sorry user, no deletes for you!
         raise Unauthorized("Sorry, no deletes.")
 
     def delete_detail(self, object_list, bundle):
-        return bundle.obj == bundle.request.user
+        return bundle.obj.user == bundle.request.user
 
 
 class RelateUserAuthorization(Authorization):
