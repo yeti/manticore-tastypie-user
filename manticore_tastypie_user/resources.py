@@ -242,6 +242,7 @@ class SearchUserResource(BaseUserResource):
         }
 
     def dehydrate(self, bundle):
+        bundle = super(SearchUserResource, self).dehydrate(bundle)
         if bundle.obj in bundle.request.user.user_following():
             bundle.data['following'] = True
         else:
