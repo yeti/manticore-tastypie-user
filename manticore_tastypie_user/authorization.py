@@ -70,6 +70,15 @@ class UserObjectsOnlyAuthorization(Authorization):
 
 
 class RelateUserAuthorization(Authorization):
+    """
+    This authorization is used for objects that are related to an authenticated user, e.g. Comment, Like, Flag.
+
+    All users (authenticated or not) can read_list and read_detail
+    Authenticated users can also create_detail, update_list, update_detail, and delete_detail
+    No users are permissioned to create_list or delete_list
+
+    Authenticated users will have the related object automatically associated with them.
+    """
     def read_list(self, object_list, bundle):
         return object_list
 
