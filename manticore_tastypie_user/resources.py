@@ -39,7 +39,7 @@ class BaseUserResource(ManticoreModelResource):
 
     class Meta:
         # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
-        excludes = ['password']
+        excludes = ['password', 'date_joined', 'is_active', 'is_staff', 'is_superuser', 'last_login']
         allowed_methods = ['get']
         filtering = {
             "username": ['exact', 'iexact', 'contains', 'icontains']
@@ -61,7 +61,7 @@ class UserResource(BaseUserResource):
         queryset = User.objects.all()
         resource_name = "user"
         # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
-        excludes = ['password']
+        excludes = ['password', 'date_joined', 'is_active', 'is_staff', 'is_superuser', 'last_login']
         object_name = "users"
         allowed_methods = ['get']
         filtering = {
@@ -185,10 +185,10 @@ class UserSocialAuthenticationResource(ManticoreModelResource):
         fields = ['id', 'provider']
 
 
-class ChangePasswordResource(ManticoreModelResource):
+class ChangePasswordResource(BaseUserResource):
     """Takes in a new_password and old_password to change a user's password"""
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['patch']
         authorization = UserObjectsOnlyAuthorization()
@@ -196,7 +196,6 @@ class ChangePasswordResource(ManticoreModelResource):
         resource_name = "change_password"
         always_return_data = True
         object_name = "user"
-        excludes = ["original_photo", "small_photo", "large_photo", "thumbnail"]
 
     def hydrate(self, bundle):
         if not 'new_password' in bundle.data:
@@ -250,10 +249,10 @@ class SearchUserResource(BaseUserResource):
         return bundle
 
 
-class EditUserResource(PictureVideoUploadResource):
+class EditUserResource(PictureVideoUploadResource, BaseUserResource):
     """Allows the user's username and email to be changed"""
 
-    class Meta:
+    class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['patch']
         authorization = UserObjectsOnlyAuthorization()
@@ -262,14 +261,12 @@ class EditUserResource(PictureVideoUploadResource):
         always_return_data = True
         object_name = "user"
 
-    def save_related(self, bundle):
+    def hydrate(self, bundle):
         user = bundle.obj
         if 'username' in bundle.data and bundle.data['username'] != user.username and len(bundle.data['username']) > 0:
             username = bundle.data['username'].replace(' ', '')
             if User.objects.filter(username__iexact=username):
                 raise BadRequest("That username has already been used")
-            else:
-                user.username = username
 
         if 'email' in bundle.data and bundle.data['email'] != user.email and len(bundle.data['email']) > 0:
             if User.objects.filter(email=bundle.data['email']):
@@ -279,14 +276,8 @@ class EditUserResource(PictureVideoUploadResource):
                     validate_email(bundle.data['email'])
                 except ValidationError:
                     raise BadRequest("Email address is not formatted properly")
-                user.email = bundle.data['email']
 
-        if 'password' in bundle.data and len(bundle.data['password']) > 0:
-            user.set_password(base64.decodestring(bundle.data['password']))
-
-        user.save()
-
-        return super(EditUserResource, self).save_related(bundle)
+        return bundle
 
     def dispatch(self, request_type, request, **kwargs):
         # Force this to be a single User update
