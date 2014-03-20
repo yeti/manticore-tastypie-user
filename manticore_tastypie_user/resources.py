@@ -252,6 +252,8 @@ class SearchUserResource(BaseUserResource):
 class EditUserResource(PictureVideoUploadResource, BaseUserResource):
     """Allows the user's username and email to be changed"""
 
+    token = fields.CharField(readonly=True)
+
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['patch']
