@@ -58,17 +58,9 @@ def get_profile_image(strategy, details, response, uid, user, social, *args, **k
             pass
     elif strategy.backend.name == "twitter" and social:
         try:
-            # Get user info from twitter
-            user_url = "http://api.twitter.com/1.1/users/show.json?user_id=%s&include_entities=false" % uid
-            consumer = oauth2.Consumer(settings.TWITTER_CONSUMER_KEY, settings.TWITTER_CONSUMER_SECRET)
-            token = oauth2.Token(social.tokens['oauth_token'], social.tokens['oauth_token_secret'])
-            client = oauth2.Client(consumer, token)
-            resp, content = client.request(user_url)
-            twitter_user = json.loads(content)
-
             # Get profile image to save
-            if twitter_user['profile_image_url'] != '':
-                image_result = urllib.urlretrieve(twitter_user['profile_image_url'])
+            if response['profile_image_url'] != '':
+                image_result = urllib.urlretrieve(response['profile_image_url'])
 
                 done, tries = False, 0
                 while not done:
