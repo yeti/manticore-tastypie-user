@@ -12,7 +12,7 @@ from tastypie.exceptions import BadRequest
 from tastypie.models import ApiKey
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization, \
-    UserLoginAuthorization
+    UserAuthorization
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
 import settings
 
@@ -136,7 +136,7 @@ class LoginResource(BaseUserResource):
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['get']
-        authorization = UserLoginAuthorization()
+        authorization = UserAuthorization()
         authentication = BasicAuthentication()
         resource_name = "login"
         object_name = "user"
@@ -191,7 +191,7 @@ class ChangePasswordResource(BaseUserResource):
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['patch']
-        authorization = UserObjectsOnlyAuthorization()
+        authorization = UserAuthorization()
         authentication = ExpireApiKeyAuthentication()
         resource_name = "change_password"
         always_return_data = True
@@ -259,7 +259,7 @@ class EditUserResource(PictureVideoUploadResource, BaseUserResource):
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['patch']
-        authorization = UserObjectsOnlyAuthorization()
+        authorization = UserAuthorization()
         authentication = ExpireApiKeyAuthentication()
         resource_name = "edit_user"
         always_return_data = True
@@ -304,7 +304,7 @@ class MyUserResource(BaseUserResource):
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['get']
-        authorization = UserLoginAuthorization()
+        authorization = UserAuthorization()
         authentication = ExpireApiKeyAuthentication()
         resource_name = "my_user"
         object_name = "user"
@@ -336,7 +336,7 @@ class LogoutResource(BaseUserResource):
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
         allowed_methods = ['get']
-        authorization = UserObjectsOnlyAuthorization()
+        authorization = UserAuthorization()
         authentication = ExpireApiKeyAuthentication()
         resource_name = "logout"
         object_name = "logout"
