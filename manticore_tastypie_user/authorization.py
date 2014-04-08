@@ -110,8 +110,14 @@ class RelateUserAuthorization(Authorization):
         return bundle.obj.user == bundle.request.user
 
     def delete_list(self, object_list, bundle):
-        # Sorry user, no deletes for you!
-        raise Unauthorized("Sorry, no bulk deletes.")
+        allowed = []
+
+        # Since they may not all be saved, iterate over them.
+        for obj in object_list:
+            if obj.user == bundle.request.user:
+                allowed.append(obj)
+
+        return allowed
 
     def delete_detail(self, object_list, bundle):
         return bundle.obj.user == bundle.request.user
