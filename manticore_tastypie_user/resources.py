@@ -69,11 +69,14 @@ class UserResource(BaseUserResource):
         }
 
 
-class SignUpResource(BaseUserResource):
+class AuthUserResource(BaseUserResource):
+    token = fields.CharField(readonly=True)
+    default_social_providers = fields.ToManyField('manticore_tastypie_social.manticore_tastypie_social.resources.SocialProviderResource', 'default_social_providers', null=True, full=True)
+
+
+class SignUpResource(AuthUserResource):
     """Takes in an email, username, and base64 encoded password,
     creates a user then returns an API Token for further authenticated calls"""
-
-    token = fields.CharField(readonly=True)
 
     # hacky fix for birthday
     for f in User._meta.local_fields:
@@ -128,10 +131,8 @@ class SignUpResource(BaseUserResource):
         return bundle
 
 
-class LoginResource(BaseUserResource):
+class LoginResource(AuthUserResource):
     """Uses Basic Http Auth to login a user, then returns an API Token for further authenticated calls"""
-
-    token = fields.CharField(readonly=True)
 
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
@@ -142,9 +143,7 @@ class LoginResource(BaseUserResource):
         object_name = "user"
 
 
-class SocialSignUpResource(BaseUserResource):
-
-    token = fields.CharField(readonly=True)
+class SocialSignUpResource(AuthUserResource):
 
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
@@ -251,10 +250,8 @@ class SearchUserResource(BaseUserResource):
         return bundle
 
 
-class EditUserResource(PictureVideoUploadResource, BaseUserResource):
+class EditUserResource(PictureVideoUploadResource, AuthUserResource):
     """Allows the user's username and email to be changed"""
-
-    token = fields.CharField(readonly=True)
 
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
