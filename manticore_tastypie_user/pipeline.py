@@ -6,6 +6,7 @@ from urllib2 import URLError
 from django.conf import settings
 from django.core.files import File
 import oauth2
+from manticore_django.manticore_django.utils import retry_cloudfiles
 
 
 def social_auth_user(strategy, uid, user=None, *args, **kwargs):
@@ -41,19 +42,11 @@ def get_profile_image(strategy, details, response, uid, user, social, *args, **k
             image_url = "https://graph.facebook.com/%s/picture?type=large" % uid
             result = urllib.urlretrieve(image_url)
 
-            done, tries = False, 0
-            while not done:
-                try:
-                    user.original_photo.save("%s.jpg" % uid, File(open(result[0])))
-                    user.save(update_fields=['original_photo'])
-                    done = True
-                except SSLError:
-                    pass
+            def save_image(user, uid, result):
+                user.original_photo.save("%s.jpg" % uid, File(open(result[0])))
+                user.save(update_fields=['original_photo'])
 
-                # Try at max, 10 times before quitting
-                tries += 1
-                if tries > 10:
-                    done = True
+            retry_cloudfiles(save_image, user, uid, result)
         except URLError:
             pass
     elif strategy.backend.name == "twitter" and social:
@@ -62,18 +55,10 @@ def get_profile_image(strategy, details, response, uid, user, social, *args, **k
             if response['profile_image_url'] != '':
                 image_result = urllib.urlretrieve(response['profile_image_url'])
 
-                done, tries = False, 0
-                while not done:
-                    try:
-                        user.original_photo.save("%s.jpg" % uid, File(open(image_result[0])))
-                        user.save(update_fields=['original_photo'])
-                        done = True
-                    except SSLError:
-                        pass
+                def save_image(user, uid, image_result):
+                    user.original_photo.save("%s.jpg" % uid, File(open(image_result[0])))
+                    user.save(update_fields=['original_photo'])
 
-                    # Try at max, 10 times before quitting
-                    tries += 1
-                    if tries > 10:
-                        done = True
+                retry_cloudfiles(save_image, user, uid, image_result)
         except URLError:
             pass

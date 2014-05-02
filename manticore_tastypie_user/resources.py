@@ -306,6 +306,9 @@ class MyUserResource(BaseUserResource):
         resource_name = "my_user"
         object_name = "user"
 
+        #  id |            created            | notification_type | user_id | reporter_id | content_type_id | object_id
+        #  28 | 2014-04-22 20:49:16.128708+00 |                 3 |       7 |          13 |               8 |         6
+
 
 class MinimalUserResource(ManticoreModelResource):
     """Used to return minimal amount of info to identify a user"""
