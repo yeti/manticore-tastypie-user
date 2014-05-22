@@ -35,7 +35,6 @@ def _create_api_token(bundle):
 class BaseUserResource(ManticoreModelResource):
 
     class Meta:
-        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
         excludes = ['password', 'date_joined', 'is_active', 'is_staff', 'is_superuser', 'last_login']
         allowed_methods = ['get']
         filtering = {
@@ -57,7 +56,6 @@ class UserResource(BaseUserResource):
     class Meta:
         queryset = User.objects.all()
         resource_name = "user"
-        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
         excludes = ['password', 'date_joined', 'is_active', 'is_staff', 'is_superuser', 'last_login']
         object_name = "users"
         allowed_methods = ['get']
@@ -262,14 +260,9 @@ class MyUserResource(BaseUserResource):
         resource_name = "my_user"
         object_name = "user"
 
-        #  id |            created            | notification_type | user_id | reporter_id | content_type_id | object_id
-        #  28 | 2014-04-22 20:49:16.128708+00 |                 3 |       7 |          13 |               8 |         6
-
 
 class MinimalUserResource(ManticoreModelResource):
     """Used to return minimal amount of info to identify a user"""
-
-    username = fields.CharField()
 
     class Meta:
         queryset = User.objects.all()
@@ -282,9 +275,6 @@ class MinimalUserResource(ManticoreModelResource):
         filtering = {
             "id": ['exact'],
         }
-
-    def dehydrate_username(self, bundle):
-        return bundle.obj.username
 
 
 class LogoutResource(BaseUserResource):
