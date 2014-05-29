@@ -249,7 +249,7 @@ class EditUserResource(PictureVideoUploadResource, AuthUserResource):
         return super(EditUserResource, self).get_detail(request, **kwargs)
 
 
-class MyUserResource(BaseUserResource):
+class MyUserResource(AuthUserResource):
     """Used to return an authorized user's information"""
 
     class Meta(BaseUserResource.Meta):
