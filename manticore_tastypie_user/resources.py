@@ -7,6 +7,7 @@ from tastypie import fields
 from tastypie.authentication import Authentication, BasicAuthentication, MultiAuthentication
 from tastypie.authorization import Authorization, ReadOnlyAuthorization
 from tastypie.exceptions import BadRequest
+from tastypie.fields import ToManyField
 from tastypie.models import ApiKey
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserAuthorization
@@ -35,11 +36,10 @@ def _create_api_token(bundle):
 class BaseUserResource(ManticoreModelResource):
 
     class Meta:
-        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
         excludes = ['password', 'date_joined', 'is_active', 'is_staff', 'is_superuser', 'last_login']
         allowed_methods = ['get']
         filtering = {
-            "username": ['exact', 'iexact', 'contains', 'icontains']
+            User.USERNAME_FIELD: ['exact', 'iexact', 'contains', 'icontains']
         }
 
     def dehydrate(self, bundle):
@@ -57,28 +57,34 @@ class UserResource(BaseUserResource):
     class Meta:
         queryset = User.objects.all()
         resource_name = "user"
-        # fields = ['username', 'email', 'info', 'thumbnail', 'small_photo', 'large_photo', 'website', 'location']
         excludes = ['password', 'date_joined', 'is_active', 'is_staff', 'is_superuser', 'last_login']
         object_name = "users"
         allowed_methods = ['get']
         filtering = {
-            "username": ['exact', 'iexact', 'contains', 'icontains']
+            User.USERNAME_FIELD: ['exact', 'iexact', 'contains', 'icontains']
         }
 
 
 class AuthUserResource(BaseUserResource):
     token = fields.CharField(readonly=True)
-    default_social_providers = fields.ToManyField('manticore_tastypie_social.manticore_tastypie_social.resources.SocialProviderResource', 'default_social_providers', null=True, full=True)
+
+    @classmethod
+    def get_fields(cls, fields=None, excludes=None):
+        """ Only add the default_social_providers field if the social library is installed """
+        this_class = next(c for c in cls.__mro__ if c.__module__ == __name__ and c.__name__ == 'AuthUserResource')
+        final_fields = super(this_class, cls).get_fields(fields=fields, excludes=excludes)
+        if 'manticore_tastypie_social.manticore_tastypie_social' in settings.INSTALLED_APPS:
+            resource = 'manticore_tastypie_social.manticore_tastypie_social.resources.SocialProviderResource'
+            final_fields['default_social_providers'] = ToManyField(resource, 'default_social_providers',
+                                                                   null=True, full=True)
+        return final_fields
 
 
 class SignUpResource(AuthUserResource):
-    """Takes in an email, username, and base64 encoded password,
-    creates a user then returns an API Token for further authenticated calls"""
-
-    # hacky fix for birthday
-    for f in User._meta.local_fields:
-        if f.name == "birthday":
-            birthday = fields.DateField(attribute="birthday")
+    """
+    Takes in an email, base64 encoded password and the UserModel's USERNAME_FIELD,
+    creates a user then returns an API Token for further authenticated calls.
+    """
 
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
@@ -90,40 +96,47 @@ class SignUpResource(AuthUserResource):
         object_name = "user"
 
     def obj_create(self, bundle, request=None, **kwargs):
-        if not 'username' in bundle.data or not 'email' in bundle.data or not 'password' in bundle.data:
+        if not User.USERNAME_FIELD in bundle.data or not 'email' in bundle.data or not 'password' in bundle.data:
             raise BadRequest("Improper fields")
 
+        username_field_filter = {"{0}__iexact".format(User.USERNAME_FIELD): bundle.data[User.USERNAME_FIELD]}
         if User.objects.filter(email=bundle.data['email']):
             raise BadRequest("That email has already been used")
-        elif User.objects.filter(username__iexact=bundle.data['username']):
-            raise BadRequest("That username has already been used")
+        elif User.objects.filter(**username_field_filter):
+            raise BadRequest("That {0} has already been used".format(User.USERNAME_FIELD))
 
-        new_username = bundle.data['username']
-        new_email = bundle.data['email']
-        new_password = base64.decodestring(bundle.data['password'])
+        user_kwargs = {
+            User.USERNAME_FIELD: bundle.data[User.USERNAME_FIELD]
+        }
 
-        if len(new_password) == 0:
+        password = base64.decodestring(bundle.data['password'])
+        if len(password) == 0:
             raise BadRequest("Invalid password was provided")
 
+        user_kwargs['password'] = password
+
         try:
-            validate_email(new_email)
+            validate_email(bundle.data['email'])
         except ValidationError:
             raise BadRequest("Email address is not formatted properly")
 
+        user_kwargs['email'] = bundle.data['email']
+
         try:
-            user = User.objects.create_user(new_username, new_email, new_password)
+            user = User.objects.create_user(**user_kwargs)
             user.save()
 
             bundle.obj = user
 
             # Save any extra information
+            used_fields = [User.USERNAME_FIELD, 'email', 'password']
             for name, value in bundle.data.iteritems():
-                if value and value != getattr(bundle.obj, name, None) and name not in ['username', 'email', 'password']:
+                if value and value != getattr(bundle.obj, name, None) and name not in used_fields:
                     setattr(bundle.obj, name, value)
 
             bundle.obj.save()
         except IntegrityError:
-            raise BadRequest('That username has already been used')
+            raise BadRequest('That {0} has already been used'.format(User.USERNAME_FIELD))
 
         return bundle
 
@@ -192,7 +205,7 @@ class SearchUserResource(BaseUserResource):
         object_name = "user"
         filtering = {
             "id": ['exact'],
-            "username": ['exact', 'iexact', 'contains', 'icontains']
+            User.USERNAME_FIELD: ['exact', 'iexact', 'contains', 'icontains']
         }
 
     def dehydrate(self, bundle):
@@ -207,7 +220,7 @@ class SearchUserResource(BaseUserResource):
 
 
 class EditUserResource(PictureVideoUploadResource, AuthUserResource):
-    """Allows the user's username and email to be changed"""
+    """Allows the UserModel's USERNAME_FIELD and email to be changed"""
 
     class Meta(BaseUserResource.Meta):
         queryset = User.objects.all()
@@ -220,10 +233,11 @@ class EditUserResource(PictureVideoUploadResource, AuthUserResource):
 
     def hydrate(self, bundle):
         user = bundle.obj
-        if 'username' in bundle.data and bundle.data['username'] != user.username and len(bundle.data['username']) > 0:
-            username = bundle.data['username'].replace(' ', '')
-            if User.objects.filter(username__iexact=username):
-                raise BadRequest("That username has already been used")
+        if User.USERNAME_FIELD in bundle.data and bundle.data[User.USERNAME_FIELD] != getattr(user, User.USERNAME_FIELD) and len(bundle.data[User.USERNAME_FIELD]) > 0:
+            username_field = bundle.data[User.USERNAME_FIELD].replace(' ', '')
+            username_field_filter = {"{0}__iexact".format(User.USERNAME_FIELD): username_field}
+            if User.objects.filter(**username_field_filter):
+                raise BadRequest("That {0} has already been used".format(User.USERNAME_FIELD))
 
         if 'email' in bundle.data and bundle.data['email'] != user.email and len(bundle.data['email']) > 0:
             if User.objects.filter(email=bundle.data['email']):
@@ -262,14 +276,9 @@ class MyUserResource(AuthUserResource):
         resource_name = "my_user"
         object_name = "user"
 
-        #  id |            created            | notification_type | user_id | reporter_id | content_type_id | object_id
-        #  28 | 2014-04-22 20:49:16.128708+00 |                 3 |       7 |          13 |               8 |         6
-
 
 class MinimalUserResource(ManticoreModelResource):
     """Used to return minimal amount of info to identify a user"""
-
-    username = fields.CharField()
 
     class Meta:
         queryset = User.objects.all()
@@ -278,13 +287,10 @@ class MinimalUserResource(ManticoreModelResource):
         authentication = ExpireApiKeyAuthentication()
         resource_name = "user"
         object_name = "user"
-        fields = ['id', 'username']
+        fields = ['id', User.USERNAME_FIELD]
         filtering = {
             "id": ['exact'],
         }
-
-    def dehydrate_username(self, bundle):
-        return bundle.obj.username
 
 
 class LogoutResource(BaseUserResource):
