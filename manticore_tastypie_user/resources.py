@@ -1,5 +1,7 @@
 import base64
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.core.validators import validate_email
@@ -312,3 +314,42 @@ class LogoutResource(BaseUserResource):
         # Delete all ApiKeys for this user on logout
         ApiKey.objects.filter(user=filtered_list.all()[0]).delete()
         return filtered_list
+
+
+class ForgotPasswordResource(BaseUserResource):
+
+    class Meta:
+        queryset = User.objects.all()
+        resource_name = "forgot_password"
+        object_name = "forgot_password"
+        allowed_methods = ['post']
+        authorization = Authorization()
+        authentication = Authentication()
+
+    def obj_create(self, bundle, request=None, **kwargs):
+        if not 'email' in bundle.data:
+            raise BadRequest("Missing email")
+
+        try:
+            user = User.objects.get(email=bundle.data['email'])
+        except User.DoesNotExist:
+            raise BadRequest("This user account does not exist")
+        except User.MultipleObjectsReturned:
+            raise BadRequest("Multiple accounts with this email address")
+
+        form = PasswordResetForm({'email': bundle.data['email']})
+        if form.is_valid():
+            opts = {
+                'use_https': bundle.request.is_secure(),
+                'token_generator': default_token_generator,
+                'from_email': settings.DEFAULT_FROM_EMAIL,
+                'email_template_name': 'registration/password_reset_email.html',
+                'subject_template_name': 'registration/password_reset_subject.txt',
+                'request': request,
+            }
+            form.save(**opts)
+        else:
+            raise BadRequest("Sorry, password reset failed")
+
+        bundle.obj = user
+        return bundle
