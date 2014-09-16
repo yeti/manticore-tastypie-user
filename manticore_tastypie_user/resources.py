@@ -101,8 +101,9 @@ class SignUpResource(AuthUserResource):
         if not User.USERNAME_FIELD in bundle.data or not 'email' in bundle.data or not 'password' in bundle.data:
             raise BadRequest("Improper fields")
 
+        email = bundle.data['email'].lower()
         username_field_filter = {"{0}__iexact".format(User.USERNAME_FIELD): bundle.data[User.USERNAME_FIELD]}
-        if User.objects.filter(email=bundle.data['email']):
+        if User.objects.filter(email=email):
             raise BadRequest("That email has already been used")
         elif User.objects.filter(**username_field_filter):
             raise BadRequest("That {0} has already been used".format(User.USERNAME_FIELD))
@@ -118,11 +119,11 @@ class SignUpResource(AuthUserResource):
         user_kwargs['password'] = password
 
         try:
-            validate_email(bundle.data['email'])
+            validate_email(email)
         except ValidationError:
             raise BadRequest("Email address is not formatted properly")
 
-        user_kwargs['email'] = bundle.data['email']
+        user_kwargs['email'] = email
 
         try:
             user = User.objects.create_user(**user_kwargs)
