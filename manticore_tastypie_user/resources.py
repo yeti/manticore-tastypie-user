@@ -331,14 +331,15 @@ class ForgotPasswordResource(BaseUserResource):
         if not 'email' in bundle.data:
             raise BadRequest("Missing email")
 
+        email = bundle.data['email'].lower()
         try:
-            user = User.objects.get(email=bundle.data['email'])
+            user = User.objects.get(email=email)
         except User.DoesNotExist:
             raise BadRequest("This user account does not exist")
         except User.MultipleObjectsReturned:
             raise BadRequest("Multiple accounts with this email address")
 
-        form = PasswordResetForm({'email': bundle.data['email']})
+        form = PasswordResetForm({'email': email})
         if form.is_valid():
             opts = {
                 'use_https': bundle.request.is_secure(),
