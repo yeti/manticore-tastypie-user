@@ -14,6 +14,7 @@ from tastypie.models import ApiKey
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserAuthorization
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
+from manticore_tastypie_user.manticore_tastypie_user.forms import HTMLPasswordResetForm
 import settings
 
 
@@ -339,7 +340,7 @@ class ForgotPasswordResource(BaseUserResource):
         except User.MultipleObjectsReturned:
             raise BadRequest("Multiple accounts with this email address")
 
-        form = PasswordResetForm({'email': email})
+        form = HTMLPasswordResetForm({'email': email})
         if form.is_valid():
             opts = {
                 'use_https': bundle.request.is_secure(),
