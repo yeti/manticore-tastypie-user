@@ -2,7 +2,8 @@ import base64
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import IntegrityError
-from django.core.validators import email_re
+from django.core.validators import validate_email
+from django.forms import forms
 from mezzanine.accounts import get_profile_model
 from social_auth.backends import get_backend
 from social_auth.db.django_models import UserSocialAuth
@@ -100,7 +101,9 @@ class SignUpResource(BaseUserProfileResource):
         if len(new_password) == 0:
             raise BadRequest("Invalid password was provided")
 
-        if not email_re.match(new_email):
+        try:
+            validate_email(new_email)
+        except forms.ValidationError:
             raise BadRequest("Email address is not formatted properly")
 
         try:
@@ -277,10 +280,13 @@ class EditUserProfileResource(PictureVideoUploadResource):
         if 'email' in bundle.data and bundle.data['email'] != user.email and len(bundle.data['email']) > 0:
             if User.objects.filter(email=bundle.data['email']):
                 raise BadRequest("That email has already been used")
-            elif not email_re.match(bundle.data['email']):
-                raise BadRequest("Email address is not formatted properly")
             else:
-                user.email = bundle.data['email']
+                try:
+                    validate_email(bundle.data['email'])
+                except forms.ValidationError:
+                    raise BadRequest("Email address is not formatted properly")
+                else:
+                    user.email = bundle.data['email']
 
         if 'password' in bundle.data and len(bundle.data['password']) > 0:
             user.set_password(base64.decodestring(bundle.data['password']))
