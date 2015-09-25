@@ -36,7 +36,7 @@ def create_user_profile(backend, details, response, uid, user=None, social_user=
         return
 
     try:
-        user.get_profile()
+        user.userprofile
     except UserProfile.DoesNotExist:
         user_profile = UserProfile(user=user)
         user_profile.save()

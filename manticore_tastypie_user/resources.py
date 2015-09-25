@@ -1,6 +1,7 @@
 import base64
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User, AbstractBaseUser
 from django.db import IntegrityError
 from django.core.validators import validate_email
 from django.forms import forms
@@ -13,12 +14,10 @@ from tastypie.authorization import Authorization, ReadOnlyAuthorization
 from tastypie.constants import ALL_WITH_RELATIONS
 from tastypie.exceptions import BadRequest
 from tastypie.models import ApiKey
+from forecast.models import UserProfile
 from manticore_tastypie_user.manticore_tastypie_user.authentication import ExpireApiKeyAuthentication
 from manticore_tastypie_user.manticore_tastypie_user.authorization import UserObjectsOnlyAuthorization
 from manticore_tastypie_core.manticore_tastypie_core.resources import ManticoreModelResource, PictureVideoUploadResource
-
-
-UserProfile = get_profile_model()
 
 
 # Helper function for UserProfile resources to create a new API Key
@@ -37,7 +36,6 @@ def _create_api_token(bundle):
 
 
 class UserResource(ManticoreModelResource):
-
     class Meta:
         queryset = User.objects.all()
         resource_name = "user"
@@ -162,7 +160,7 @@ class SocialSignUpResource(BaseUserProfileResource):
         user = backend.do_auth(access_token, user=user)
         if user and user.is_active:
             # Set bundle obj to user profile
-            bundle.obj = user.get_profile()
+            bundle.obj = user.userprofile
             return bundle
         else:
             raise BadRequest("Error authenticating token")
@@ -219,7 +217,7 @@ class ChangePasswordResource(ManticoreModelResource):
 
     def patch_detail(self, request, **kwargs):
         # Place the authenticated user's id in the patch detail request
-        kwargs['id'] = request.user.get_profile().pk
+        kwargs['id'] = request.user.userprofile.pk
         return super(ChangePasswordResource, self).patch_detail(request, **kwargs)
 
 
@@ -301,12 +299,12 @@ class EditUserProfileResource(PictureVideoUploadResource):
 
     def patch_detail(self, request, **kwargs):
         # Place the authenticated user's id in the patch detail request
-        kwargs['id'] = request.user.get_profile().pk
+        kwargs['id'] = request.user.userprofile.pk
         return super(EditUserProfileResource, self).patch_detail(request, **kwargs)
 
     def get_detail(self, request, **kwargs):
         # Place the authenticated user's id in the get detail request
-        kwargs['id'] = request.user.get_profile().pk
+        kwargs['id'] = request.user.userprofile.pk
         return super(EditUserProfileResource, self).get_detail(request, **kwargs)
 
 
